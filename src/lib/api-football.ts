@@ -193,9 +193,9 @@ export async function fetchApiFootballOdds(apiKey?: string): Promise<MatchFixtur
       return nums.reduce((acc, n) => acc + n, 0) / nums.length;
     };
 
-    const homeOdds = price(homeName);
+    const homeOdds = price("Home");
     const drawOdds = price("Draw");
-    const awayOdds = price(awayName);
+    const awayOdds = price("Away");
     if (homeOdds === null || drawOdds === null || awayOdds === null) continue;
     if (!Number.isFinite(homeOdds) || !Number.isFinite(drawOdds) || !Number.isFinite(awayOdds)) continue;
 
