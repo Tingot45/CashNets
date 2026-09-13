@@ -40,7 +40,7 @@ export interface LeagueMeta {
   region: string;
 }
 
-export type PoolDataSource = "api-football" | "odds-api" | "mock";
+export type PoolDataSource = "odds-api" | "mock";
 
 export interface FixturesResponse {
   fixtures: FixtureWithSentiment[];

@@ -58,19 +58,11 @@ export default function Header({
         <div className="flex items-center gap-2.5">
           <StatusDot
             on={oddsConfigured}
-            label={
-              dataSource === "api-football"
-                ? "API-Football odds"
-                : dataSource === "odds-api"
-                  ? "Live bookmaker odds"
-                  : "Simulated pool"
-            }
+            label={dataSource === "mock" ? "Simulated pool" : "Live odds"}
             title={
-              dataSource === "api-football"
-                ? "Live 1X2 odds streaming via API-Football free tier"
-                : dataSource === "odds-api"
-                  ? "Connected to The Odds API"
-                  : "No odds key configured — running on realistic simulated fixtures"
+              oddsConfigured
+                ? "Connected to The Odds API"
+                : "No ODDS_API_KEY — running on realistic simulated fixtures"
             }
           />
           <StatusDot on={geminiConfigured} label="Gemini" title={geminiConfigured ? "Gemini AI ready" : "No GEMINI_API_KEY — using the seeded sentiment model"} />

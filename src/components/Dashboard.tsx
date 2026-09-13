@@ -248,8 +248,8 @@ export default function Dashboard() {
             Home win (&ldquo;1&rdquo;) is the only market the engine is permitted to pick. Away legs are never highlighted.
           </p>
           <p className="tabular">
-            Timezone Eastern African Time (UTC+3) · live 1X2 odds via API-Football free tier · sentiment via Gemini AI
-            with an instant seeded fallback model
+            Timezone Eastern African Time (UTC+3) · live 1X2 odds via The Odds API · sentiment via Gemini AI with an
+            instant seeded fallback model
           </p>
         </footer>
       </main>
