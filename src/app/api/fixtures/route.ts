@@ -1,11 +1,13 @@
 import { NextResponse } from "next/server";
 import type { FixturesResponse } from "@/lib/types";
 import { loadFixtures, warmUp, getLeagues } from "@/lib/fixture-store";
+import { scheduleDailyRefresh } from "@/lib/daily-refresh";
 import { hasGeminiKey } from "@/lib/sentiment";
 
 export const dynamic = "force-dynamic";
 
 void warmUp();
+void scheduleDailyRefresh();
 
 export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);
