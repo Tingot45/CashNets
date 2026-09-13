@@ -61,5 +61,14 @@ function scheduleNext() {
 export function scheduleDailyRefresh() {
   if (globalThis.__dailyRefreshScheduled) return;
   globalThis.__dailyRefreshScheduled = true;
+
+  // On Vercel the refresh is handled by the vercel.json cron job hitting
+  // /api/cron at 21:00 UTC (00:00 EAT). An in-process timer would be
+  // unreliable in serverless.
+  if (process.env.VERCEL) {
+    console.log("[daily-refresh] on Vercel — using vercel.json cron instead of an in-process timer");
+    return;
+  }
+
   scheduleNext();
 }

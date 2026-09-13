@@ -3,10 +3,18 @@ import { fetchOddsFixtures } from "./odds-api";
 import { computeSeededSentiment } from "./sentiment";
 import { buildMockFixtures } from "./mock-data";
 import { LEAGUES } from "./leagues";
+import { head, put } from "@vercel/blob";
 
 const CACHE_TTL_MS = 15 * 60 * 1000;
+const BLOB_PATH = "cache/fixtures.json";
 
 export type DataSource = "odds-api" | "mock";
+
+interface StoredPayload {
+  fixtures: MatchFixture[];
+  fetchedAt: number;
+  source: DataSource;
+}
 
 interface CacheEntry {
   data: FixtureWithSentiment[];
@@ -14,9 +22,44 @@ interface CacheEntry {
   source: DataSource;
 }
 
-let cache: CacheEntry | null = null;
+let memory: CacheEntry | null = null;
 let inflight: Promise<CacheEntry> | null = null;
 let warmStarted = false;
+
+function canBlob(): boolean {
+  return Boolean(process.env.BLOB_READ_WRITE_TOKEN && process.env.BLOB_READ_WRITE_TOKEN.length > 0);
+}
+
+async function readBlobCache(): Promise<StoredPayload | null> {
+  if (!canBlob()) return null;
+  try {
+    const meta = await head(BLOB_PATH);
+    if (!meta?.url) return null;
+    const res = await fetch(meta.url, { cache: "no-store", signal: AbortSignal.timeout(10_000) });
+    if (!res.ok) return null;
+    const payload = (await res.json()) as StoredPayload;
+    if (!Array.isArray(payload.fixtures)) return null;
+    return payload;
+  } catch (err) {
+    console.error("[fixture-store] shared cache read failed:", err);
+    return null;
+  }
+}
+
+async function writeBlobCache(payload: StoredPayload): Promise<void> {
+  if (!canBlob()) return;
+  try {
+    await put(BLOB_PATH, JSON.stringify(payload), {
+      access: "public",
+      contentType: "application/json",
+      addRandomSuffix: false,
+      cacheControlMaxAge: 0,
+    });
+    console.log("[fixture-store] shared cache written to Vercel Blob");
+  } catch (err) {
+    console.error("[fixture-store] shared cache write failed:", err);
+  }
+}
 
 function seedFixtures(raw: MatchFixture[]): FixtureWithSentiment[] {
   return raw.map((m) => ({
@@ -44,15 +87,43 @@ async function loadFromLiveSources(): Promise<{ raw: MatchFixture[]; source: Dat
 }
 
 export async function loadFixtures(force = false): Promise<CacheEntry> {
-  if (!force && cache && Date.now() - cache.fetchedAt < CACHE_TTL_MS) {
-    return cache;
-  }
   if (inflight) return inflight;
+  if (!force && memory && Date.now() - memory.fetchedAt < CACHE_TTL_MS) {
+    return memory;
+  }
 
   inflight = (async (): Promise<CacheEntry> => {
-    const { raw, source } = await loadFromLiveSources();
-    const entry: CacheEntry = { data: seedFixtures(raw), fetchedAt: Date.now(), source };
-    cache = entry;
+    let payload: StoredPayload | null = null;
+
+    // 1. Fresh shared cache (survives serverless cold starts).
+    if (!force) {
+      const blob = await readBlobCache();
+      if (blob && Date.now() - blob.fetchedAt < CACHE_TTL_MS) payload = blob;
+    }
+
+    // 2. Refetch from the live source.
+    if (!payload) {
+      const { raw, source } = await loadFromLiveSources();
+      if (source !== "mock" && raw.length > 0) {
+        payload = { fixtures: raw, fetchedAt: Date.now(), source };
+        void writeBlobCache(payload);
+      } else {
+        // Live source failed — fall back to the newest known data, then mock.
+        const stale = await readBlobCache();
+        if (stale && stale.fixtures.length > 0) {
+          payload = stale;
+        } else {
+          payload = { fixtures: raw, fetchedAt: Date.now(), source: "mock" };
+        }
+      }
+    }
+
+    const entry: CacheEntry = {
+      data: seedFixtures(payload.fixtures),
+      fetchedAt: payload.fetchedAt,
+      source: payload.source,
+    };
+    memory = entry;
     return entry;
   })();
 
